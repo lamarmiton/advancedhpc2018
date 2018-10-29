@@ -29,15 +29,18 @@ int main(int argc, char **argv) {
 
     printf("Starting labwork %d\n", lwNum);
     Timer timer;
+    Timer timerLab1; // We use another timer in lab1, so better to use another one here
     timer.start();
     switch (lwNum) {
         case 1:
+	    timerLab1.start();
             labwork.labwork1_CPU();
             labwork.saveOutputImage("labwork2-cpu-out.jpg");
-            printf("labwork 1 CPU ellapsed %.1fms\n", lwNum, timer.getElapsedTimeInMilliSec());
-            timer.start();
+            printf("labwork 1 CPU ellapsed %.1fms\n", lwNum, timerLab1.getElapsedTimeInMilliSec());
+            timerLab1.start();
             labwork.labwork1_OpenMP();
             labwork.saveOutputImage("labwork2-openmp-out.jpg");
+	    printf("labwork 1 OpenMP ellapsed %.1fms\n",lwNum, timerLab1.getElapsedTimeInMilliSec());
             break;
         case 2:
             labwork.labwork2_GPU();
@@ -102,6 +105,18 @@ void Labwork::labwork1_CPU() {
 }
 
 void Labwork::labwork1_OpenMP() {
+    int pixelCount = inputImage->width * inputImage->height;
+    outputImage = static_cast<char *>(malloc(pixelCount * 3));
+    #pragma omp parallel for
+    for (int j = 0; j < 100; j++) {             // let's do it 100 times, otherwise it's too fast!
+	#pragma omp parallel for
+        for (int i = 0; i < pixelCount; i++) {
+            outputImage[i * 3] = (char) (((int) inputImage->buffer[i * 3] + (int) inputImage->buffer[i * 3 + 1] +
+                                          (int) inputImage->buffer[i * 3 + 2]) / 3);
+            outputImage[i * 3 + 1] = outputImage[i * 3];
+            outputImage[i * 3 + 2] = outputImage[i * 3];
+        }
+    }
 
 }
 
