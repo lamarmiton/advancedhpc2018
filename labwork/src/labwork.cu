@@ -4,7 +4,6 @@
 #include <omp.h>
 
 #define ACTIVE_THREADS 4
-
 int main(int argc, char **argv) {
     printf("USTH ICT Master 2018, Advanced Programming for HPC.\n");
     if (argc < 2) {
