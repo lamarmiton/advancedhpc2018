@@ -1,3 +1,0 @@
-/home/advancedhpc/jeremyRichard/advancedhpc2018/labwork/build/CMakeFiles/rebuild_cache.dir
-/home/advancedhpc/jeremyRichard/advancedhpc2018/labwork/build/CMakeFiles/edit_cache.dir
-/home/advancedhpc/jeremyRichard/advancedhpc2018/labwork/build/CMakeFiles/labwork.dir
