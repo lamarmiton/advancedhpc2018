@@ -107,9 +107,9 @@ void Labwork::labwork1_CPU() {
 void Labwork::labwork1_OpenMP() {
     int pixelCount = inputImage->width * inputImage->height;
     outputImage = static_cast<char *>(malloc(pixelCount * 3));
-    #pragma omp parallel for
+    #pragma opm teams for
     for (int j = 0; j < 100; j++) {             // let's do it 100 times, otherwise it's too fast!
-	#pragma omp parallel for
+	#pragma teams for
         for (int i = 0; i < pixelCount; i++) {
             outputImage[i * 3] = (char) (((int) inputImage->buffer[i * 3] + (int) inputImage->buffer[i * 3 + 1] +
                                           (int) inputImage->buffer[i * 3 + 2]) / 3);
@@ -147,7 +147,30 @@ int getSPcores(cudaDeviceProp devProp) {
 }
 
 void Labwork::labwork2_GPU() {
-    
+  int nbDevices;	
+
+  printf("Scanning devices ..\n");
+  
+  cudaGetDeviceCount(&nbDevices);	// Get the number of devices
+
+
+  printf("We got %d devices here\n\n",nbDevices);
+
+  for (int i = 0; i < nbDevices; i++) {
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, i);
+    printf("Device Number: %d\n", i);	// Display the id of the device
+    printf("Number of core : %d\n",getSPcores(prop)); // Display number of core
+    printf("Device name: %s\n", prop.name);	// Display the name of the device
+    printf("Multiprocessor count: %d\n", prop.multiProcessorCount); // Display the number of Multi processor
+    printf("Wrap Size : %d\n", prop.warpSize); // Display the wrapSize
+    printf("Memory Clock Rate : %d\n",
+           prop.memoryClockRate);	// Display Memory ClockRate
+    printf("Memory Bus Width ): %d\n",
+           prop.memoryBusWidth);	// Display Memory bus Width
+    printf("Peak Memory Bandwidth : %f\n\n",
+           2.0*prop.memoryClockRate*(prop.memoryBusWidth/8));	//Display memory Brandwith
+  }  
 }
 
 void Labwork::labwork3_GPU() {
