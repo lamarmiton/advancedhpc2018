@@ -159,16 +159,16 @@ void Labwork::labwork2_GPU() {
   for (int i = 0; i < nbDevices; i++) {
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, i);
+    printf("Device name: %s\n", prop.name);	// Display the name of the device
     printf("Device Number: %d\n", i);	// Display the id of the device
     printf("Number of core : %d\n",getSPcores(prop)); // Display number of core
-    printf("Device name: %s\n", prop.name);	// Display the name of the device
     printf("Multiprocessor count: %d\n", prop.multiProcessorCount); // Display the number of Multi processor
-    printf("Wrap Size : %d\n", prop.warpSize); // Display the wrapSize
-    printf("Memory Clock Rate : %d\n",
+    printf("Warp Size : %d threads\n", prop.warpSize); // Display the wrapSize
+    printf("Memory Clock Rate : %d kHz\n",
            prop.memoryClockRate);	// Display Memory ClockRate
-    printf("Memory Bus Width ): %d\n",
+    printf("Memory Bus Width : %d bits\n",
            prop.memoryBusWidth);	// Display Memory bus Width
-    printf("Peak Memory Bandwidth : %f\n\n",
+    printf("Peak Memory Bandwidth : %f GB/s\n\n",
            2.0*prop.memoryClockRate*(prop.memoryBusWidth/8));	//Display memory Brandwith
   }  
 }
