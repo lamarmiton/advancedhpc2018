@@ -177,10 +177,9 @@ void Labwork::labwork2_GPU() {
 
 __global__ void grayscale(uchar3 *input, uchar3 *output) {
 
-int tid = threadIdx.x + blockIdx.x * blockDim.x;
-output[tid].x = (input[tid].x + input[tid].y +
-input[tid].z) / 3;
-output[tid].z = output[tid].y = output[tid].x;
+	int tid = threadIdx.x + blockIdx.x * blockDim.x;
+	output[tid].x = (input[tid].x + input[tid].y + input[tid].z) / 3;
+	output[tid].z = output[tid].y = output[tid].x;
 
 }
 	
@@ -188,7 +187,7 @@ void Labwork::labwork3_GPU() {
 	
 	// Get the basic variable such as the pixelcount block size etc ..
 	int pixelCount = inputImage->width * inputImage->height;
-	int blockSize = 64;
+	int blockSize = 1024;
 	int numBlock = pixelCount / blockSize;
 
 	
