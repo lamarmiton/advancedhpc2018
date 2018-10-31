@@ -169,12 +169,51 @@ void Labwork::labwork2_GPU() {
     printf("Memory Bus Width : %d bits\n",
            prop.memoryBusWidth);	// Display Memory bus Width
     printf("Peak Memory Bandwidth : %f GB/s\n\n",
-           2.0*prop.memoryClockRate*(prop.memoryBusWidth/8));	//Display memory Brandwith
+           2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1e9);	//Display memory Brandwith
   }  
 }
 
+//Making the kernel
+
+__global__ void grayscale(uchar3 *input, uchar3 *output) {
+
+int tid = threadIdx.x + blockIdx.x * blockDim.x;
+output[tid].x = (input[tid].x + input[tid].y +
+input[tid].z) / 3;
+output[tid].z = output[tid].y = output[tid].x;
+
+}
+	
 void Labwork::labwork3_GPU() {
-   
+	
+	// Get the basic variable such as the pixelcount block size etc ..
+	int pixelCount = inputImage->width * inputImage->height;
+	int blockSize = 64;
+	int numBlock = pixelCount / blockSize;
+
+	
+	uchar3 *devInput;
+	uchar3 *devGray;
+	
+	// Initialize the output image
+	outputImage = static_cast<char *>(malloc(pixelCount * 3));
+	
+	// Allocate the memory in the device for the Deviceinput and the Deviceouput
+	cudaMalloc(&devInput, pixelCount * sizeof(uchar3));
+	cudaMalloc(&devGray, pixelCount * sizeof(uchar3));
+	
+	// Copy from the HostInput to the devInput (here, the image)
+	cudaMemcpy(devInput, inputImage->buffer,pixelCount * sizeof(uchar3),cudaMemcpyHostToDevice);
+	
+	// Do the thing you want to do
+	grayscale<<<numBlock, blockSize>>>(devInput, devGray);
+	
+	// Copy from the DeviceOutput to the HostOutput (here the image in grayscale)
+	cudaMemcpy(outputImage, devGray,pixelCount * sizeof(uchar3),cudaMemcpyDeviceToHost);
+	
+	// Don't forget to free
+	cudaFree(devInput);
+	cudaFree(devGray);
 }
 
 void Labwork::labwork4_GPU() {
