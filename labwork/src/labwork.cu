@@ -214,11 +214,15 @@ void Labwork::labwork3_GPU() {
 	cudaFree(devGray);
 }
 
-__global__ void grayscale2D(uchar3 *input, uchar3 *output, int imageWidth) {
-	
+__global__ void grayscale2D(uchar3 *input, uchar3 *output, int imageWidth, int imageHeight) {
+
 	// We need to know where we are rigth now
 	int x = threadIdx.x + blockIdx.x * blockDim.x;
 	int y = threadIdx.y + blockIdx.y * blockDim.y;
+	
+	// Whecking if we are still in the image
+	if(x>=imageWidth) return;
+	if(y>=imageHeight) return;
 	
 	int tid = imageWidth * y + x; // RowSize * y + x
 
@@ -232,7 +236,7 @@ void Labwork::labwork4_GPU() {
    	// Get the basic variable such as the pixelcount block size etc ..
 	int pixelCount = inputImage->width * inputImage->height;
 	dim3 blockSize = dim3(32, 32);
-	dim3 gridSize = dim3(inputImage->width/blockSize.x, inputImage->height/blockSize.y);
+	dim3 gridSize = dim3(ceil(inputImage->width/blockSize.x), ceil(inputImage->height/blockSize.y));
 
 	uchar3 *devInput;
 	uchar3 *devGray;
@@ -248,7 +252,7 @@ void Labwork::labwork4_GPU() {
 	cudaMemcpy(devInput, inputImage->buffer,pixelCount * sizeof(uchar3),cudaMemcpyHostToDevice);
 	
 	// Do the thing you want to do
-	grayscale2D<<<gridSize, blockSize>>>(devInput, devGray, inputImage->width);
+	grayscale2D<<<gridSize, blockSize>>>(devInput, devGray, inputImage->width, inputImage->height);
 	
 	// Copy from the DeviceOutput to the HostOutput (here the image in grayscale)
 	cudaMemcpy(outputImage, devGray,pixelCount * sizeof(uchar3),cudaMemcpyDeviceToHost);
