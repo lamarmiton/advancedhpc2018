@@ -2,7 +2,9 @@
 \documentclass[paper=a4, fontsize=11pt]{scrartcl}
 
 \usepackage[english]{babel}	
-
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.15}
 
 %%% Custom sectioning
 \usepackage{sectsty}
@@ -58,15 +60,47 @@ void Labwork::labwork3_GPU() {
     
     First, we initialize the basic settings of our image, the number of pixels, the size and the number of blocks.Then, we allocate the memory that DevInput and DevOutput will use, using the cudaMalloc function. We can now copy the image (Basically the HostInput) from inputImageBuffer to our freshly allocated devInput variable using cudamemecpy. The device can now execute the grayscale Kernel on the image. The output of the operation will be store in devGray (DevOutput). Using cudaMemecpy we can copy the data from devGray to our output Image. Don't forget to free devInput and devGray, we won't use those anymore.\newline
     
-    The output : 
+    The output : ( labwork 1 vs labwork 2 )
     
     \begin{verbatim}
-    
+    USTH ICT Master 2018, Advanced Programming for HPC.
+	Warming up...
+	Starting labwork 1
+	labwork 1 CPU ellapsed 3179.9ms
+	labwork 1 OpenMP ellapsed 813.1ms
+
+    ___________________________________________
     USTH ICT Master 2018, Advanced Programming for HPC.
     Warming up...
     Starting labwork 3
     labwork 3 ellapsed 82.0ms
 
     \end{verbatim}
+    
+    \begin{tikzpicture}
+
+\begin{axis}[
+    title={Speed vs Block size},
+    xlabel={Block size},
+    ylabel={Speed},
+    xmin=0, xmax=1024,
+    ymin=0, ymax=120,
+    xtick={0,128,256,512,1024},
+    ytick={0,20,40,60,80,100,120},
+    legend pos=north west,
+    ymajorgrids=true,
+    grid style=dashed,
+]
+ 
+\addplot[
+    color=blue,
+    mark=square,
+    ]
+    coordinates {
+    (32,80)(64,80)(128,80)(256,100)(512,103.2)(1024,102.4)
+    };
+ 
+\end{axis}
+\end{tikzpicture}
 %%% End document
 \end{document}

@@ -107,9 +107,9 @@ void Labwork::labwork1_CPU() {
 void Labwork::labwork1_OpenMP() {
     int pixelCount = inputImage->width * inputImage->height;
     outputImage = static_cast<char *>(malloc(pixelCount * 3));
-    #pragma opm teams for
+    #pragma opm parallele for
     for (int j = 0; j < 100; j++) {             // let's do it 100 times, otherwise it's too fast!
-	#pragma teams for
+	#pragma opm parallele for
         for (int i = 0; i < pixelCount; i++) {
             outputImage[i * 3] = (char) (((int) inputImage->buffer[i * 3] + (int) inputImage->buffer[i * 3 + 1] +
                                           (int) inputImage->buffer[i * 3 + 2]) / 3);
@@ -190,7 +190,6 @@ void Labwork::labwork3_GPU() {
 	int blockSize = 1024;
 	int numBlock = pixelCount / blockSize;
 
-	
 	uchar3 *devInput;
 	uchar3 *devGray;
 	
@@ -215,8 +214,35 @@ void Labwork::labwork3_GPU() {
 	cudaFree(devGray);
 }
 
+
 void Labwork::labwork4_GPU() {
-   
+   	// Get the basic variable such as the pixelcount block size etc ..
+	int pixelCount = inputImage->width * inputImage->height;
+	dim3 gridSize = dim3(8, 8);
+	dim3 blockSize = dim3(32, 32);
+
+	uchar3 *devInput;
+	uchar3 *devGray;
+	
+	// Initialize the output image
+	outputImage = static_cast<char *>(malloc(pixelCount * 3));
+	
+	// Allocate the memory in the device for the Deviceinput and the Deviceouput
+	cudaMalloc(&devInput, pixelCount * sizeof(uchar3));
+	cudaMalloc(&devGray, pixelCount * sizeof(uchar3));
+	
+	// Copy from the HostInput to the devInput (here, the image)
+	cudaMemcpy(devInput, inputImage->buffer,pixelCount * sizeof(uchar3),cudaMemcpyHostToDevice);
+	
+	// Do the thing you want to do
+	grayscale<<<gridSize, blockSize>>>(devInput, devGray);
+	
+	// Copy from the DeviceOutput to the HostOutput (here the image in grayscale)
+	cudaMemcpy(outputImage, devGray,pixelCount * sizeof(uchar3),cudaMemcpyDeviceToHost);
+	
+	// Don't forget to free
+	cudaFree(devInput);
+	cudaFree(devGray);
 }
 
 // CPU implementation of Gaussian Blur
