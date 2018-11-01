@@ -220,7 +220,7 @@ __global__ void grayscale2D(uchar3 *input, uchar3 *output, int imageWidth, int i
 	int x = threadIdx.x + blockIdx.x * blockDim.x;
 	int y = threadIdx.y + blockIdx.y * blockDim.y;
 	
-	// Whecking if we are still in the image
+	// Checking if we are still in the image
 	if(x>=imageWidth) return;
 	if(y>=imageHeight) return;
 	
