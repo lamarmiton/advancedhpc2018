@@ -33,14 +33,14 @@ int main(int argc, char **argv) {
     timer.start();
     switch (lwNum) {
         case 1:
-	    timerLab1.start();
+	    	timerLab1.start();
             labwork.labwork1_CPU();
             labwork.saveOutputImage("labwork2-cpu-out.jpg");
             printf("labwork 1 CPU ellapsed %.1fms\n", lwNum, timerLab1.getElapsedTimeInMilliSec());
             timerLab1.start();
             labwork.labwork1_OpenMP();
             labwork.saveOutputImage("labwork2-openmp-out.jpg");
-	    printf("labwork 1 OpenMP ellapsed %.1fms\n",lwNum, timerLab1.getElapsedTimeInMilliSec());
+	    	printf("labwork 1 OpenMP ellapsed %.1fms\n",lwNum, timerLab1.getElapsedTimeInMilliSec());
             break;
         case 2:
             labwork.labwork2_GPU();
@@ -54,9 +54,20 @@ int main(int argc, char **argv) {
             labwork.saveOutputImage("labwork4-gpu-out.jpg");
             break;
         case 5:
-            labwork.labwork5_CPU();
-            labwork.saveOutputImage("labwork5-cpu-out.jpg");
+        	// Speedup of shared memory
+            //timerLab1.start();
+            //labwork.labwork5_CPU();
+            //printf("labwork 5 CPU ellapsed %.1fms\n",lwNum, timerLab1.getElapsedTimeInMilliSec());
+        	// Speedup of global memory
+        	timerLab1.start();
             labwork.labwork5_GPU();
+            printf("labwork 5 GPU non-shared memory ellapsed %.1fms\n",lwNum, timerLab1.getElapsedTimeInMilliSec());
+            
+            // Speedup of shared memory
+            timerLab1.start();
+            labwork.labwork5_GPUShared();
+            printf("labwork 5 GPU shared memory ellapsed %.1fms\n",lwNum, timerLab1.getElapsedTimeInMilliSec());
+            
             labwork.saveOutputImage("labwork5-gpu-out.jpg");
             break;
         case 6:
@@ -299,8 +310,8 @@ void Labwork::labwork5_CPU() {
     }
 }
 
-__global__ void blur(uchar3 *input, uchar3 *output, int *kernel, int imageWidth, int imageHeight) {
-                     
+__global__ void blur(uchar3 *input, uchar3 *output, int* kernel, int imageWidth, int imageHeight) {                 	 
+                     	 
 	// We need to know where we are rigth now
 	int tidx = threadIdx.x + blockIdx.x * blockDim.x;
 	int tidy = threadIdx.y + blockIdx.y * blockDim.y;
@@ -332,52 +343,156 @@ __global__ void blur(uchar3 *input, uchar3 *output, int *kernel, int imageWidth,
 		            c += coefficient;
 		            
                 }
-        }
+     }
         
-         sum /= c;
-         int posOut = tidy * imageWidth + tidx;
-         output[posOut].y = output[posOut].x = output[posOut].z = sum;
+     sum /= c;
+     int posOut = tidy * imageWidth + tidx;
+     output[posOut].y = output[posOut].x = output[posOut].z = sum;
+
 	
+	
+}
+
+__global__ void blurSharedMemory(uchar3 *input, uchar3 *output, int *kernel, int imageWidth, int imageHeight) {                 	 
+
+	// We need to know where we are rigth now
+	int tidx = threadIdx.x + blockIdx.x * blockDim.x;
+	int tidy = threadIdx.y + blockIdx.y * blockDim.y;
+	
+    int tid = threadIdx.x + threadIdx.y * blockDim.x;
+	 
+	// Creating the shared matrice
+   	__shared__ int sharedKernel[49];
+    if (tid < 49) sharedKernel[tid] = kernel[tid]; 
+    __syncthreads();
+    
+    
+	// Checking if we are still in the image
+	if(tidx>=imageWidth || tidy>=imageHeight) return;
+	
+	int sum = 0;
+	int c = 0;
+
+	// moving on in the matrix
+	for (int y = -3; y <= 3; y++) {
+                for (int x = -3; x <= 3; x++) {	
+                	
+		            int i = tidx + x;
+		            int j = tidy + y;
+		            
+		            //We won't take pixel that's outside the image.
+		            if (i < 0 || j < 0 || i >= imageWidth || j >= imageHeight) continue;
+		            
+		            int tid = imageWidth * j + i; // RowSize * j + i, get the position of our pixel
+		            
+		            //Aplying gray filter on the pixel
+		            unsigned char gray = (input[tid].x + input[tid].y + input[tid].z) / 3;
+		            
+		            //Applying Gaussian blur and stuff
+		            int coefficient = sharedKernel[(y+3) * 7 + x + 3];
+		            sum = sum + gray * coefficient;
+		            c += coefficient;
+		            
+                }
+     }
+        
+     sum /= c;
+     int posOut = tidy * imageWidth + tidx;
+     output[posOut].y = output[posOut].x = output[posOut].z = sum;
+
 	
 	
 }
 
 void Labwork::labwork5_GPU() {
-	int kernel[] = { 0,  0,  1,   2,  1,  0, 0,  
-                     	 0,  3,  13, 22,  13, 3, 0,  
-                     	 1, 13,  59, 97,  59,13, 1,  
-                     	 2, 22,  97,159,  97,22, 2,  
-                     	 1, 13,  59, 97,  59, 13,1,  
-                     	 0,  3,  13, 22,  13,  3,0,
-                     	 0,  0,   1,  2,   1,  0,0 };
-                     	 
-       	// Get the basic variable such as the pixelcount block size etc ..
+    int kernel[] = { 0,  0,  1,   2,  1,  0, 0,  
+                 	 0,  3,  13, 22,  13, 3, 0,  
+                 	 1, 13,  59, 97,  59,13, 1,  
+                 	 2, 22,  97,159,  97,22, 2,  
+                 	 1, 13,  59, 97,  59, 13,1,  
+                 	 0,  3,  13, 22,  13,  3,0,
+                 	 0,  0,   1,  2,   1,  0,0 };
+                 	                 	 
+    // Get the basic variable such as the pixelcount block size etc ..
 	int pixelCount = inputImage->width * inputImage->height;
 	dim3 blockSize = dim3(32,32);
 	dim3 gridSize = dim3(ceil(inputImage->width/blockSize.x), ceil(inputImage->height/blockSize.y));
 
 	uchar3 *devInput;
-	uchar3 *devGray;
+	uchar3 *devBlur;
+	// Matrice memory
+	int *devKernel;
 	
 	// Initialize the output image
 	outputImage = static_cast<char *>(malloc(pixelCount * 3));
 	
 	// Allocate the memory in the device for the Deviceinput and the Deviceouput
 	cudaMalloc(&devInput, pixelCount * sizeof(uchar3));
-	cudaMalloc(&devGray, pixelCount * sizeof(uchar3));
+	cudaMalloc(&devBlur, pixelCount * sizeof(uchar3));
+	// Allocate memory for the matrice
+	cudaMalloc(&devKernel, sizeof(kernel));
 	
 	// Copy from the HostInput to the devInput (here, the image)
 	cudaMemcpy(devInput, inputImage->buffer,pixelCount * sizeof(uchar3),cudaMemcpyHostToDevice);
+	// Copy the kernel matrice into the device
+	cudaMemcpy(devKernel, kernel,sizeof(kernel),cudaMemcpyHostToDevice);
 	
 	// Do the thing you want to do
-	blur<<<gridSize, blockSize>>>(devInput, devGray, kernel, inputImage->width, inputImage->height);
+	blur<<<gridSize, blockSize>>>(devInput, devBlur, devKernel, inputImage->width, inputImage->height);
 	
 	// Copy from the DeviceOutput to the HostOutput (here the image in grayscale)
-	cudaMemcpy(outputImage, devGray,pixelCount * sizeof(uchar3),cudaMemcpyDeviceToHost);
+	cudaMemcpy(outputImage, devBlur,pixelCount * sizeof(uchar3),cudaMemcpyDeviceToHost);
 	
 	// Don't forget to free
 	cudaFree(devInput);
-	cudaFree(devGray);
+	cudaFree(devBlur);
+	cudaFree(devKernel);
+}
+
+
+void Labwork::labwork5_GPUShared() {
+    int kernel[] = { 0,  0,  1,   2,  1,  0, 0,  
+                 	 0,  3,  13, 22,  13, 3, 0,  
+                 	 1, 13,  59, 97,  59,13, 1,  
+                 	 2, 22,  97,159,  97,22, 2,  
+                 	 1, 13,  59, 97,  59, 13,1,  
+                 	 0,  3,  13, 22,  13,  3,0,
+                 	 0,  0,   1,  2,   1,  0,0 };
+                 	                 	 
+    // Get the basic variable such as the pixelcount block size etc ..
+	int pixelCount = inputImage->width * inputImage->height;
+	dim3 blockSize = dim3(32,32);
+	dim3 gridSize = dim3(ceil(inputImage->width/blockSize.x), ceil(inputImage->height/blockSize.y));
+
+	uchar3 *devInput;
+	uchar3 *devBlur;
+	// Matrice memory
+	int *devKernel;
+	
+	// Initialize the output image
+	outputImage = static_cast<char *>(malloc(pixelCount * 3));
+	
+	// Allocate the memory in the device for the Deviceinput and the Deviceouput
+	cudaMalloc(&devInput, pixelCount * sizeof(uchar3));
+	cudaMalloc(&devBlur, pixelCount * sizeof(uchar3));
+	// Allocate memory for the matrice
+	cudaMalloc(&devKernel, sizeof(kernel));
+	
+	// Copy from the HostInput to the devInput (here, the image)
+	cudaMemcpy(devInput, inputImage->buffer,pixelCount * sizeof(uchar3),cudaMemcpyHostToDevice);
+	// Copy the kernel matrice into the device
+	cudaMemcpy(devKernel, kernel,sizeof(kernel),cudaMemcpyHostToDevice);
+	
+	// Do the thing you want to do
+	blurSharedMemory<<<gridSize, blockSize>>>(devInput, devBlur, devKernel, inputImage->width, inputImage->height);
+	
+	// Copy from the DeviceOutput to the HostOutput (here the image in grayscale)
+	cudaMemcpy(outputImage, devBlur,pixelCount * sizeof(uchar3),cudaMemcpyDeviceToHost);
+	
+	// Don't forget to free
+	cudaFree(devInput);
+	cudaFree(devBlur);
+	cudaFree(devKernel);
 }
 
 void Labwork::labwork6_GPU() {
