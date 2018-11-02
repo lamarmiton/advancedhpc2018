@@ -169,7 +169,7 @@ void Labwork::labwork2_GPU() {
     printf("Memory Bus Width : %d bits\n",
            prop.memoryBusWidth);	// Display Memory bus Width
     printf("Peak Memory Bandwidth : %f GB/s\n\n",
-           2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1e9);	//Display memory Brandwith
+           2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1e6);	//Display memory Brandwith
   }  
 }
 
@@ -221,21 +221,20 @@ __global__ void grayscale2D(uchar3 *input, uchar3 *output, int imageWidth, int i
 	int y = threadIdx.y + blockIdx.y * blockDim.y;
 	
 	// Checking if we are still in the image
-	if(x>=imageWidth) return;
-	if(y>=imageHeight) return;
+	if(x>=imageWidth || y>=imageHeight) return;
 	
 	int tid = imageWidth * y + x; // RowSize * y + x
 
 	// We turn the pixel gray
-	output[tid].x = (input[tid].x + input[tid].y + input[tid].z) / 3;
-	output[tid].z = output[tid].y = output[tid].x;
+	unsigned char value = (input[tid].x + input[tid].y + input[tid].z) / 3;
+	output[tid].z = output[tid].y = output[tid].x = value;
 
 }
 
 void Labwork::labwork4_GPU() {
    	// Get the basic variable such as the pixelcount block size etc ..
 	int pixelCount = inputImage->width * inputImage->height;
-	dim3 blockSize = dim3(32, 32);
+	dim3 blockSize = dim3(32,32);
 	dim3 gridSize = dim3(ceil(inputImage->width/blockSize.x), ceil(inputImage->height/blockSize.y));
 
 	uchar3 *devInput;
@@ -264,13 +263,14 @@ void Labwork::labwork4_GPU() {
 
 // CPU implementation of Gaussian Blur
 void Labwork::labwork5_CPU() {
-    int kernel[] = { 0, 0, 1, 2, 1, 0, 0,  
-                     0, 3, 13, 22, 13, 3, 0,  
-                     1, 13, 59, 97, 59, 13, 1,  
-                     2, 22, 97, 159, 97, 22, 2,  
-                     1, 13, 59, 97, 59, 13, 1,  
-                     0, 3, 13, 22, 13, 3, 0,
-                     0, 0, 1, 2, 1, 0, 0 };
+    int kernel[] = { 0,  0,  1,   2,  1,  0, 0,  
+                     0,  3,  13, 22,  13, 3, 0,  
+                     1, 13,  59, 97,  59,13, 1,  
+                     2, 22,  97,159,  97,22, 2,  
+                     1, 13,  59, 97,  59, 13,1,  
+                     0,  3,  13, 22,  13,  3,0,
+                     0,  0,   1,  2,   1,  0,0 };
+                     
     int pixelCount = inputImage->width * inputImage->height;
     outputImage = (char*) malloc(pixelCount * sizeof(char) * 3);
     for (int row = 0; row < inputImage->height; row++) {
@@ -299,8 +299,85 @@ void Labwork::labwork5_CPU() {
     }
 }
 
+__global__ void blur(uchar3 *input, uchar3 *output, int *kernel, int imageWidth, int imageHeight) {
+                     
+	// We need to know where we are rigth now
+	int tidx = threadIdx.x + blockIdx.x * blockDim.x;
+	int tidy = threadIdx.y + blockIdx.y * blockDim.y;
+	
+	// Checking if we are still in the image
+	if(tidx>=imageWidth || tidy>=imageHeight) return;
+	
+	int sum = 0;
+	int c = 0;
+	
+	// moving on in the matrix
+	for (int y = -3; y <= 3; y++) {
+                for (int x = -3; x <= 3; x++) {	
+                	
+		            int i = tidx + x;
+		            int j = tidy + y;
+		            
+		            //We won't take pixel that's outside the image.
+		            if (i < 0 || j < 0 || i >= imageWidth || j >= imageHeight) continue;
+		            
+		            int tid = imageWidth * j + i; // RowSize * j + i, get the position of our pixel
+		            
+		            //Aplying gray filter on the pixel
+		            unsigned char gray = (input[tid].x + input[tid].y + input[tid].z) / 3;
+		            
+		            //Applying Gaussian blur and stuff
+		            int coefficient = kernel[(y+3) * 7 + x + 3];
+		            sum = sum + gray * coefficient;
+		            c += coefficient;
+		            
+                }
+        }
+        
+         sum /= c;
+         int posOut = tidy * imageWidth + tidx;
+         output[posOut].y = output[posOut].x = output[posOut].z = sum;
+	
+	
+	
+}
+
 void Labwork::labwork5_GPU() {
-    
+	int kernel[] = { 0,  0,  1,   2,  1,  0, 0,  
+                     	 0,  3,  13, 22,  13, 3, 0,  
+                     	 1, 13,  59, 97,  59,13, 1,  
+                     	 2, 22,  97,159,  97,22, 2,  
+                     	 1, 13,  59, 97,  59, 13,1,  
+                     	 0,  3,  13, 22,  13,  3,0,
+                     	 0,  0,   1,  2,   1,  0,0 };
+                     	 
+       	// Get the basic variable such as the pixelcount block size etc ..
+	int pixelCount = inputImage->width * inputImage->height;
+	dim3 blockSize = dim3(32,32);
+	dim3 gridSize = dim3(ceil(inputImage->width/blockSize.x), ceil(inputImage->height/blockSize.y));
+
+	uchar3 *devInput;
+	uchar3 *devGray;
+	
+	// Initialize the output image
+	outputImage = static_cast<char *>(malloc(pixelCount * 3));
+	
+	// Allocate the memory in the device for the Deviceinput and the Deviceouput
+	cudaMalloc(&devInput, pixelCount * sizeof(uchar3));
+	cudaMalloc(&devGray, pixelCount * sizeof(uchar3));
+	
+	// Copy from the HostInput to the devInput (here, the image)
+	cudaMemcpy(devInput, inputImage->buffer,pixelCount * sizeof(uchar3),cudaMemcpyHostToDevice);
+	
+	// Do the thing you want to do
+	blur<<<gridSize, blockSize>>>(devInput, devGray, kernel, inputImage->width, inputImage->height);
+	
+	// Copy from the DeviceOutput to the HostOutput (here the image in grayscale)
+	cudaMemcpy(outputImage, devGray,pixelCount * sizeof(uchar3),cudaMemcpyDeviceToHost);
+	
+	// Don't forget to free
+	cudaFree(devInput);
+	cudaFree(devGray);
 }
 
 void Labwork::labwork6_GPU() {
